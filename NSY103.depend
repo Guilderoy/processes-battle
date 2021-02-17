@@ -1,0 +1,13 @@
+# depslib dependency file v1.0
+1613508754 source:/home/guillaume/Documents/NSY103/main.c
+	<stdio.h>
+	<stdlib.h>
+	<unistd.h>
+
+1613594324 source:/home/guillaume/Documents/NSY10333/main.c
+	<stdio.h>
+	<signal.h>
+	<stdlib.h>
+	<unistd.h>
+	<stdbool.h>
+
