@@ -7,9 +7,11 @@
 #define LECTURE 0
 #define ECRITURE 1
 #define MAX NULL
+#define NBFICHIER 10
 
 volatile sig_atomic_t print_flag = false;
-int* tube[5][2];
+int tube[5][2];
+int f;
 
 void createFiles();
 void createProcesses();
@@ -65,6 +67,7 @@ void createProcesses(){
 void createQG(){
 
 pid_t pidqg[2];
+int j=0;
 
     for(int i=0;i<2;i++) // Je créé mes processus enfants
     {
@@ -76,7 +79,8 @@ pid_t pidqg[2];
             close(tube[i][LECTURE]);
             for(;;){
                 sleep(2);
-                writeOrder();
+                writeOrder(j);
+                j++;
             }
             close(tube[i][ECRITURE]);
 
@@ -134,11 +138,19 @@ pid_t pidattaquant[5];
 
 // Gestion du sig alarm toute les 20sec
 
-void writeOrder(){
+void writeOrder(int j){
 
-    for(int i=0;i<5;i++){
-        write(tube[i][ECRITURE],"attaquez \n",15);
-    }
+    char buff[15];
+    int nbattaquant=5;
+    srand(time(NULL));
+    for(int i=0;i<nbattaquant;i++){
+        int nRandonNumber = rand()%((100+1)-0) + 0;
+        sprintf(buff,"F%d.txt",nRandonNumber);
+        write(tube[i][ECRITURE],buff,15);
+
+   }
+
+
 }
 
 
