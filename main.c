@@ -16,7 +16,7 @@ void createProcesses();
 void createQG();
 void createAttaquant();
 void alarm_attaque();
-void handle_alarm();
+void writeOrder();
 
 int main()
 {
@@ -25,7 +25,6 @@ int main()
     printf("-- Initialisation de la bataille de processus -- \n");
     createFiles();
     createProcesses();
-    //handle_alarm();
 }
 
 // Creation de mes fichiers au début du programme
@@ -73,8 +72,16 @@ pid_t pidqg[2];
         if(pidqg[i] == 0)
         {
             createAttaquant();
+
+            close(tube[i][LECTURE]);
+            for(;;){
+                sleep(2);
+                writeOrder();
+            }
+            close(tube[i][ECRITURE]);
+
             printf("[ process QG créé ] pid %d from [process game master] pid %d\n",getpid(),getppid());
-            wait(MAX);
+            wait(2);
             exit(0);
         }
 
@@ -87,7 +94,7 @@ void createAttaquant(){
 
 // Initialisation du pipe pour la communication entre processus
 
-char LectureTube[15];
+char LectureTube[25];
 pid_t pidattaquant[5];
 
     // Itération pour création tube par attaquant
@@ -107,14 +114,15 @@ pid_t pidattaquant[5];
 
                 close(tube[i][ECRITURE]);
 
-                while(1){
-                  read(tube[i][LECTURE],LectureTube,15);
-                  sleep(MAX);
+                for(;;){
+                  read(tube[i][LECTURE],&LectureTube,25);
                   printf("C'est le processus (pid=%d) qui a recu le message suivant %s du processus QG %d \n",getpid(),LectureTube,getppid());
+                  /* Futur partie code de l'attaque ecriture fichier */
                 }
 
                 close(tube[i][LECTURE]);
             }
+
     }
 
     /* On ecrit ici d'un QG vers un fils
@@ -123,37 +131,13 @@ pid_t pidattaquant[5];
 
 }
 
-// On écrit au tube pour envoyer l'ordre d'attaque aux fils
+
+// Gestion du sig alarm toute les 20sec
 
 void writeOrder(){
 
     for(int i=0;i<5;i++){
-        close(tube[i][LECTURE]);
-        write(tube[i][ECRITURE],"attaquez",15);
-        close(tube[i][ECRITURE]);
-    }
-}
-
-// Flag pour tempo alarme
-
-void alarm_attaque( int sig ) {
-    print_flag = true;
-}
-
-// Gestion du sig alarm toute les 20sec
-
-void handle_alarm(){
-
-    signal( SIGALRM, alarm_attaque );
-    alarm( 20 );
-    for (;;) {
-        sleep( 20 );
-        if ( print_flag ) {
-            // On lance l'ordre d'attaque chaque 20 secondes
-            writeOrder();
-            print_flag = false;
-            alarm( 20 );
-        }
+        write(tube[i][ECRITURE],"attaquez \n",15);
     }
 }
 
