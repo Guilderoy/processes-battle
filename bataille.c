@@ -1,10 +1,16 @@
 #define LECTURE 0
 #define ECRITURE 1
-#define NB_ATTAQUANT 5
-#define NB_FICHIER 100
+#define NB_ATTAQUANT 4
+#define NB_FICHIER 2
+#define TPS 2
 
 //Variables globales
 key_t SEMAPHORE_KEY=0x2021;
+
+typedef struct{
+    int equipe;
+    int attaquant;
+}PID_FICHIERS;
 
 //Création du type SEMBUF
 typedef struct {
@@ -15,6 +21,7 @@ typedef struct {
 
 //Déclaration de la structure de contrôle des sémaphores pour les fichiers
 SEMBUF semaphoresFichiers;
+PID_FICHIERS recupFichier;
 
 int semaphoresId;
 
@@ -31,21 +38,19 @@ void createFiles(char creation, short numfiles){
     for (i = 0; i < numfiles; i++){
         
        
-        sprintf(filename, "F%d.txt", i);
+        sprintf(filename, "F%d.bin", i);
         
         //Création des fichiers
         if (creation=='C'){
             files[i] = fopen(filename, "w");
-            //printf("Fichier %i est cree %li\n");
-            printf("Fichier %i créé\n",i);
             fclose(files[i]);
+            printf("Fichier:\t%d créé\n",i);
         }
 
         //Suppression des fichiers
         else if(creation == 'S'){
+            printf("Fichier :\t%d supprimé\n",i);
             remove(filename);
-            //printf("Fichier %i est supprimé %li\n");
-            printf("Fichier %i supprimé\n",i);
         }
                 
     }
@@ -55,85 +60,19 @@ void createFiles(char creation, short numfiles){
     //Création
     if(creation=='C'){
         semaphoresId=semget(SEMAPHORE_KEY,(int)numfiles, 750 | IPC_CREAT | IPC_EXCL);
-        semctl(semaphoresId, 0, SETVAL,0);
+        for(i=0;i<numfiles;i++){
+            semctl(semaphoresId, i, SETVAL,1);
+        }
+       
     }
 
     //Destruction
     else if(creation=='S'){
-        semctl(semaphoresId,0,IPC_RMID,0);
+        semctl(semaphoresId,i,IPC_RMID,0);
     }
     
 }
 
-
-
-void createQG(){
-	int i=0; //Variable utilisée pour les boucles
-
-	pid_t pidqg[2];
-
-    for(i=0;i<2;i++) // Je créé mes processus enfants
-    {
-        pidqg[i] = fork();
-        if(pidqg[i] == 0)
-        {
-            //createAttaquant();
-            printf("[ process QG créé ] pid %d from [process game master] pid %d\n",getpid(),getppid());
-            wait(NULL);
-            exit(0);
-        }
-
-    }
-}
-
-
-void createAttaquant(){
-
-	// Initialisation du pipe pour la communication entre processus
-	char LectureTube[15];
-	int tube[5][2];
-	pid_t pidattaquant[NB_ATTAQUANT];
-	int i=0; //Variable utilisée pour les boucles
-
-    for(i=0; i<NB_ATTAQUANT ;i++){
-        pipe(tube[i]);
-    }
-
-    for(i=0;i<NB_ATTAQUANT;i++){ // Je créé mes processus enfants
-
-        pidattaquant[i] = fork();
-
-            if(pidattaquant[i] == 0)
-            {
-                //printf("[ process Attaquant créé ] pid %d sous les ordre du  [process QG ] %d\n",getpid(),getppid());
-
-                // On lit notre descripteur qui vient de Processus QG
-
-                //close(tube[i][ECRITURE]);
-
-                
-                read(tube[i][LECTURE],LectureTube,15);
-                printf("C'est le processus (pid=%d) qui a recu le message suivant %s du processus QG %d \n",getpid(),LectureTube,getppid());
-                pause();
-                exit(0);
-                
-
-                //close(tube[i][LECTURE]);
-
-            }
-    }
-
-    /* On ecrit ici d'un QG vers un fils
-    On initialise nos tubes TODO mettre tempo toutes les 20 secondes
-    On ecrit le message de notre descripteur qui est destiné a chaque processus fils */
-
-    /*for(i=0;i<5;i++){
-
-        close(tube[i][LECTURE]);
-        write(tube[i][ECRITURE],"attaquez",15);
-        close(tube[i][ECRITURE]);
-    }*/
-}
 
 //void createFileSemaphore procédure à écrire pour la gestion des sémaphores.
 void useSemaphore(SEMBUF *structure,char type,unsigned short num){
@@ -147,4 +86,45 @@ void useSemaphore(SEMBUF *structure,char type,unsigned short num){
 	}
 
 	structure->sem_flg=0;
+}
+
+void attaque(int occurence){
+
+    char nomFichier[15];
+    pid_t pidRecup;
+    FILE *fichierBinaire;
+    sprintf(nomFichier,"F%d.bin",occurence);
+    int pidEquipe=0;
+    int pidAttaquant=0;
+    
+    printf("P\t%d\n",getpid());
+    useSemaphore(&semaphoresFichiers,'P',occurence);
+    semop(semaphoresId,&semaphoresFichiers,1);
+
+    fichierBinaire=fopen(nomFichier,"rb");
+    //On se déplace au niveau du PID
+    fseek(fichierBinaire,0,SEEK_SET);
+    fread(&pidEquipe,sizeof(int),1,fichierBinaire);
+    fread(&pidAttaquant,sizeof(int),1,fichierBinaire);
+    fclose(fichierBinaire);
+
+    fichierBinaire=fopen(nomFichier,"wb");
+    fseek(fichierBinaire,0,SEEK_SET);
+    pidRecup=getppid();
+    fwrite(&pidRecup,sizeof(pidRecup),1,fichierBinaire);
+    pidRecup=getpid();
+    fwrite(&pidRecup,sizeof(pidRecup),1,fichierBinaire);
+    fclose(fichierBinaire);
+
+    if(getppid()!=pidEquipe && pidEquipe>0 && pidAttaquant>0){
+        kill(pidAttaquant,SIGQUIT);
+    }
+    
+    sleep(TPS);
+    printf("V\t%d\n",getpid());
+
+    useSemaphore(&semaphoresFichiers,'V',occurence);
+    semop(semaphoresId,&semaphoresFichiers,(unsigned short)1);
+
+   //Pas fini
 }
