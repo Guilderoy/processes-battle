@@ -8,6 +8,23 @@
 #define ECRITURE 1
 #define MAX NULL
 #define NBFICHIER 10
+#define TPS 2
+
+//Variables globales
+key_t SEMAPHORE_KEY=0x2021;
+
+//Création du type SEMBUF
+typedef struct {
+	unsigned short sem_num;
+	short sem_op;
+	short sem_flg
+}SEMBUF;
+
+//Déclaration de la structure de contrôle des sémaphores pour les fichiers
+
+SEMBUF semaphoresFichiers;
+
+int semaphoresId;
 
 FILE *fptr;
 int tube[5][2];
@@ -20,7 +37,7 @@ void createAttaquant();
 void alarm_attaque();
 void writeOrder();
 void writeFiles();
-void readFiles();
+void readFilesAndKill();
 
 struct identityPID
 {
@@ -152,7 +169,7 @@ void writeOrder(int j){
    int nbattaquant=5;
    srand(time(NULL));
    for(int i=0;i<nbattaquant;i++){
-        int nRandonNumber = rand()%((100+1)-0) + 0;
+        int nRandonNumber = rand()%((NBFICHIER+1)-0) + 0;
         sprintf(buff,"F%d.bin",nRandonNumber);
         write(tube[i][ECRITURE],buff,15);
    }
@@ -160,7 +177,7 @@ void writeOrder(int j){
 }
 
 
-void readFiles(char *filepath){
+void readFilesAndKill(char *filepath){
 
    int n;
    struct identityPID num;
@@ -172,9 +189,16 @@ void readFiles(char *filepath){
        exit(1);
    }
 
-   for(n = 1; n < NBFICHIER; ++n){
+   for(n = 1; n < 5; ++n){
       fread(&num, sizeof(struct identityPID), 1, fptr);
-      printf("PID RECUPERE: %d\ NUMERO d'EQUIPE: %d\n", num.n1, num.n2);
+      //printf("PID RECUPERE: %d NUMERO d'EQUIPE: %d\n", num.n1, num.n2);
+
+      // Tuer le processus ennemi
+
+      if(num.n2 != getppid() && num.n2 > 0){
+         printf("ON TUE LE PROC ENNEMI %d \n", num.n1);
+      }
+
    }
    fclose(fptr);
 
@@ -193,12 +217,12 @@ void writeFile(char *filepath){
        exit(1);
    }
 
-   printf("Ecriture dans le fichier %s par %d de l'equipe %d",filepath,getpid(),getppid());
+   //printf("Ecriture dans le fichier %s par %d de l'equipe %d",filepath,getpid(),getppid());
 
    num.n1 = getpid();
    num.n2 = getppid();
 
-   for(int n = 1; n < NBFICHIER; ++n)
+   for(int n = 1; n < 5; ++n)
    {
       num.n1 = getpid();
       num.n2 = getppid();
@@ -206,7 +230,7 @@ void writeFile(char *filepath){
       fwrite(&num, sizeof(struct identityPID), 1, fptr);
    }
    fclose(fptr);
-   readFiles(filepath);
+   readFilesAndKill(filepath);
    return 0;
 }
 
