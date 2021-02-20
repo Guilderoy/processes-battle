@@ -9,7 +9,7 @@
 #define MAX NULL
 #define NBFICHIER 10
 
-volatile sig_atomic_t print_flag = false;
+FILE *fptr;
 int tube[5][2];
 int f;
 
@@ -19,6 +19,13 @@ void createQG();
 void createAttaquant();
 void alarm_attaque();
 void writeOrder();
+void writeFiles();
+void readFiles();
+
+struct identityPID
+{
+   int n1,n2;
+};
 
 int main()
 {
@@ -32,16 +39,16 @@ int main()
 // Creation de mes fichiers au début du programme
 
 void createFiles(){
-    int numfiles = 10;
-    FILE *files[numfiles];
+
+    FILE *files[NBFICHIER];
 
     printf("-- Création des fichiers en cours -- \n");
 
-    for (int i = 0; i < numfiles; i++)
+    for (int i = 0; i < NBFICHIER; i++)
     {
-        char filename[10];
-        sprintf(filename, "F%d.txt", i);
-        files[i] = fopen(filename, "w");
+        char filename[NBFICHIER];
+        sprintf(filename, "F%d.bin", i);
+        files[i] = fopen(filename, "wb");
         printf("fichier %i est cree %li\n");
     }
 
@@ -121,6 +128,7 @@ pid_t pidattaquant[5];
                 for(;;){
                   read(tube[i][LECTURE],&LectureTube,25);
                   printf("C'est le processus (pid=%d) qui a recu le message suivant %s du processus QG %d \n",getpid(),LectureTube,getppid());
+                  writeFile(LectureTube);
                   /* Futur partie code de l'attaque ecriture fichier */
                 }
 
@@ -140,19 +148,67 @@ pid_t pidattaquant[5];
 
 void writeOrder(int j){
 
-    char buff[15];
-    int nbattaquant=5;
-    srand(time(NULL));
-    for(int i=0;i<nbattaquant;i++){
+   char buff[15];
+   int nbattaquant=5;
+   srand(time(NULL));
+   for(int i=0;i<nbattaquant;i++){
         int nRandonNumber = rand()%((100+1)-0) + 0;
-        sprintf(buff,"F%d.txt",nRandonNumber);
+        sprintf(buff,"F%d.bin",nRandonNumber);
         write(tube[i][ECRITURE],buff,15);
-
    }
-
 
 }
 
+
+void readFiles(char *filepath){
+
+   int n;
+   struct identityPID num;
+
+   // Si le fichier n'existe pas on affiche un erreur
+
+   if ((fptr = fopen(filepath,"rb")) == NULL){
+       printf("Ce fichier n'existe pas !!");
+       exit(1);
+   }
+
+   for(n = 1; n < NBFICHIER; ++n){
+      fread(&num, sizeof(struct identityPID), 1, fptr);
+      printf("PID RECUPERE: %d\ NUMERO d'EQUIPE: %d\n", num.n1, num.n2);
+   }
+   fclose(fptr);
+
+   return 0;
+
+}
+
+
+void writeFile(char *filepath){
+
+   struct identityPID num;
+   FILE *fptr;
+
+   if ((fptr = fopen(filepath,"wb")) == NULL){
+       printf("Ce fichier n'existe pas !!!");
+       exit(1);
+   }
+
+   printf("Ecriture dans le fichier %s par %d de l'equipe %d",filepath,getpid(),getppid());
+
+   num.n1 = getpid();
+   num.n2 = getppid();
+
+   for(int n = 1; n < NBFICHIER; ++n)
+   {
+      num.n1 = getpid();
+      num.n2 = getppid();
+
+      fwrite(&num, sizeof(struct identityPID), 1, fptr);
+   }
+   fclose(fptr);
+   readFiles(filepath);
+   return 0;
+}
 
 
 
